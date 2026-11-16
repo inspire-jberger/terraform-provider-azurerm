@@ -45,11 +45,16 @@ type CdnFrontDoorSecurityPolicyFirewallModel struct {
 type CdnFrontDoorSecurityPolicyAssociationModel struct {
 	Domain          []CdnFrontDoorSecurityPolicyDomainModel `tfschema:"domain"`
 	PatternsToMatch []string                                `tfschema:"patterns_to_match"`
+	Route           []CdnFrontDoorSecurityPolicyRouteModel  `tfschema:"route"`
 }
 
 type CdnFrontDoorSecurityPolicyDomainModel struct {
 	Active               bool   `tfschema:"active"`
 	CdnFrontDoorDomainId string `tfschema:"cdn_frontdoor_domain_id"`
+}
+
+type CdnFrontDoorSecurityPolicyRouteModel struct {
+	CdnFrontDoorRouteId string `tfschema:"cdn_frontdoor_route_id"`
 }
 
 func (DataSource) ResourceType() string {
@@ -110,6 +115,18 @@ func (DataSource) Attributes() map[string]*pluginsdk.Schema {
 															Computed: true,
 														},
 														"cdn_frontdoor_domain_id": {
+															Type:     pluginsdk.TypeString,
+															Computed: true,
+														},
+													},
+												},
+											},
+											"route": {
+												Type:     pluginsdk.TypeList,
+												Computed: true,
+												Elem: &pluginsdk.Resource{
+													Schema: map[string]*pluginsdk.Schema{
+														"cdn_frontdoor_route_id": {
 															Type:     pluginsdk.TypeString,
 															Computed: true,
 														},
@@ -211,9 +228,22 @@ func flattenCdnFrontDoorSecurityPolicyDataSource(input securitypolicies.Security
 				return results, fmt.Errorf("flattening `domain`: %+v", err)
 			}
 
+			routeIds, err := flattenSecurityPoliciesResourceReference(item.Routes)
+			if err != nil {
+				return results, fmt.Errorf("flattening `route`: %+v", err)
+			}
+
+			route := make([]CdnFrontDoorSecurityPolicyRouteModel, 0, len(routeIds))
+			for _, id := range routeIds {
+				route = append(route, CdnFrontDoorSecurityPolicyRouteModel{
+					CdnFrontDoorRouteId: id,
+				})
+			}
+
 			associations = append(associations, CdnFrontDoorSecurityPolicyAssociationModel{
 				Domain:          domain,
 				PatternsToMatch: pointer.From(item.PatternsToMatch),
+				Route:           route,
 			})
 		}
 	}

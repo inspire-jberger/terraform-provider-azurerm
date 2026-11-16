@@ -133,6 +133,8 @@ An `association` block exports the following:
 
 * `domain` - A `domain` block as defined below.
 
+* `route` - A `route` block as defined below.
+
 * `patterns_to_match` - The paths associated with this firewall policy.
 
 ---
@@ -142,6 +144,12 @@ A `domain` block exports the following:
 * `active` - Is the Front Door Custom Domain or Front Door Endpoint active?
 
 * `cdn_frontdoor_domain_id` - The ID of the Front Door Custom Domain or Front Door Endpoint associated with this Front Door Security Policy.
+
+---
+
+A `route` block exports the following:
+
+* `cdn_frontdoor_route_id` - The ID of the Front Door Route associated with this Front Door Security Policy.
 
 ## Timeouts
 

@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/afddomains"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/afdendpoints"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/profiles"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/routes"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/frontdoor/2024-02-01/webapplicationfirewallpolicies"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/cdn/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
@@ -60,8 +61,12 @@ func cdnFrontdoorSecurityPolicySchema() map[string]*pluginsdk.Schema {
 											// NOTE: The max number of domains vary depending on sku: 100 Standard, 500 Premium
 											"domain": {
 												Type:     pluginsdk.TypeList,
-												Required: true,
+												Optional: true,
 												MaxItems: 500,
+												AtLeastOneOf: []string{
+													"security_policies.0.firewall.0.association.0.domain",
+													"security_policies.0.firewall.0.association.0.route",
+												},
 
 												Elem: &pluginsdk.Resource{
 													Schema: map[string]*pluginsdk.Schema{
@@ -77,6 +82,25 @@ func cdnFrontdoorSecurityPolicySchema() map[string]*pluginsdk.Schema {
 														"active": {
 															Type:     pluginsdk.TypeBool,
 															Computed: true,
+														},
+													},
+												},
+											},
+
+											"route": {
+												Type:     pluginsdk.TypeList,
+												Optional: true,
+												AtLeastOneOf: []string{
+													"security_policies.0.firewall.0.association.0.domain",
+													"security_policies.0.firewall.0.association.0.route",
+												},
+
+												Elem: &pluginsdk.Resource{
+													Schema: map[string]*pluginsdk.Schema{
+														"cdn_frontdoor_route_id": {
+															Type:         pluginsdk.TypeString,
+															Required:     true,
+															ValidateFunc: routes.ValidateRouteID,
 														},
 													},
 												},

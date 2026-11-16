@@ -140,6 +140,29 @@ func TestAccCdnFrontDoorSecurityPolicy_completeEndpoint(t *testing.T) {
 	})
 }
 
+func TestAccCdnFrontDoorSecurityPolicy_routeAssociation(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_cdn_frontdoor_security_policy", "test")
+	r := CdnFrontDoorSecurityPolicyResource{}
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.routeAssociation(data, false),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("security_policies.0.firewall.0.association.0.route.0.cdn_frontdoor_route_id").MatchesOtherKey(check.That("azurerm_cdn_frontdoor_route.test").Key("id")),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.routeAssociation(data, true),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("security_policies.0.firewall.0.association.0.route.0.cdn_frontdoor_route_id").MatchesOtherKey(check.That("azurerm_cdn_frontdoor_route.test").Key("id")),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func (r CdnFrontDoorSecurityPolicyResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
 	id, err := securitypolicies.ParseSecurityPolicyID(state.ID)
 	if err != nil {
@@ -589,4 +612,77 @@ resource "azurerm_cdn_frontdoor_security_policy" "test" {
   }
 }
 `, template, data.RandomInteger)
+}
+
+func (r CdnFrontDoorSecurityPolicyResource) routeAssociation(data acceptance.TestData, includeDomain bool) string {
+	domain := ""
+	if includeDomain {
+		domain = `
+        domain {
+          cdn_frontdoor_domain_id = azurerm_cdn_frontdoor_endpoint.test.id
+        }
+`
+	}
+
+	return fmt.Sprintf(`
+provider "azurerm" {
+  features {}
+}
+
+%s
+
+resource "azurerm_cdn_frontdoor_origin_group" "test" {
+  name                     = "accTestOriginGroup-%d"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.test.id
+
+  load_balancing {
+    additional_latency_in_milliseconds = 0
+    sample_size                        = 16
+    successful_samples_required        = 3
+  }
+}
+
+resource "azurerm_cdn_frontdoor_origin" "test" {
+  name                          = "accTestOrigin-%d"
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.test.id
+  enabled                       = true
+
+  certificate_name_check_enabled = false
+  host_name                      = "contoso.com"
+  http_port                      = 80
+  https_port                     = 443
+  origin_host_header             = "www.contoso.com"
+  priority                       = 1
+  weight                         = 1
+}
+
+resource "azurerm_cdn_frontdoor_route" "test" {
+  name                          = "accTestRoute-%d"
+  cdn_frontdoor_endpoint_id     = azurerm_cdn_frontdoor_endpoint.test.id
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.test.id
+  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.test.id]
+  patterns_to_match             = ["/*"]
+  supported_protocols           = ["Http", "Https"]
+}
+
+resource "azurerm_cdn_frontdoor_security_policy" "test" {
+  name                     = "accTestSecPol%d"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.test.id
+
+  security_policies {
+    firewall {
+      cdn_frontdoor_firewall_policy_id = azurerm_cdn_frontdoor_firewall_policy.test.id
+
+      association {
+        %s
+        route {
+          cdn_frontdoor_route_id = azurerm_cdn_frontdoor_route.test.id
+        }
+
+        patterns_to_match = ["/*"]
+      }
+    }
+  }
+}
+`, r.templateEndpoint(data), data.RandomInteger, data.RandomInteger, data.RandomInteger, data.RandomInteger, domain)
 }

@@ -24,6 +24,36 @@ resource "azurerm_cdn_frontdoor_profile" "example" {
   sku_name            = "Standard_AzureFrontDoor"
 }
 
+resource "azurerm_cdn_frontdoor_endpoint" "example" {
+  name                     = "example-endpoint"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.example.id
+}
+
+resource "azurerm_cdn_frontdoor_origin_group" "example" {
+  name                     = "example-origin-group"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.example.id
+
+  load_balancing {
+    additional_latency_in_milliseconds = 0
+    sample_size                        = 4
+    successful_samples_required        = 3
+  }
+}
+
+resource "azurerm_cdn_frontdoor_origin" "example" {
+  name                          = "example-origin"
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.example.id
+  enabled                       = true
+
+  certificate_name_check_enabled = true
+  host_name                      = "www.contoso.com"
+  http_port                      = 80
+  https_port                     = 443
+  origin_host_header             = "www.contoso.com"
+  priority                       = 1
+  weight                         = 1000
+}
+
 resource "azurerm_cdn_frontdoor_firewall_policy" "example" {
   name                              = "exampleWAF"
   resource_group_name               = azurerm_resource_group.example.name
@@ -69,6 +99,16 @@ resource "azurerm_cdn_frontdoor_custom_domain" "example" {
   }
 }
 
+resource "azurerm_cdn_frontdoor_route" "example" {
+  name                            = "example-route"
+  cdn_frontdoor_endpoint_id       = azurerm_cdn_frontdoor_endpoint.example.id
+  cdn_frontdoor_origin_group_id   = azurerm_cdn_frontdoor_origin_group.example.id
+  cdn_frontdoor_origin_ids        = [azurerm_cdn_frontdoor_origin.example.id]
+  cdn_frontdoor_custom_domain_ids = [azurerm_cdn_frontdoor_custom_domain.example.id]
+  patterns_to_match               = ["/*"]
+  supported_protocols             = ["Http", "Https"]
+}
+
 resource "azurerm_cdn_frontdoor_security_policy" "example" {
   name                     = "Example-Security-Policy"
   cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.example.id
@@ -81,6 +121,11 @@ resource "azurerm_cdn_frontdoor_security_policy" "example" {
         domain {
           cdn_frontdoor_domain_id = azurerm_cdn_frontdoor_custom_domain.example.id
         }
+
+        route {
+          cdn_frontdoor_route_id = azurerm_cdn_frontdoor_route.example.id
+        }
+
         patterns_to_match = ["/*"]
       }
     }
@@ -116,17 +161,27 @@ A `firewall` block supports the following:
 
 An `association` block supports the following:
 
-* `domain` - (Required) One or more `domain` blocks as defined below.
+* `patterns_to_match` - (Required) The list of paths to match for this firewall policy. The only possible value is `/*`. Changing this forces a new resource to be created.
+
+* `domain` - (Optional) One or more `domain` blocks as defined below.
 
 ~> **Note:** The number of `domain` blocks that may be included in the configuration varies depending on the `sku_name` field of the linked Front Door Profile. The `Standard_AzureFrontDoor` sku may contain up to 100 `domain` blocks and a `Premium_AzureFrontDoor` sku may contain up to 500 `domain` blocks.
 
-* `patterns_to_match` - (Required) The list of paths to match for this firewall policy. The only possible value is `/*`. Changing this forces a new resource to be created.
+* `route` - (Optional) One or more `route` blocks as defined below.
+
+~> **Note:** At least one of `domain` or `route` must be specified.
 
 ---
 
 A `domain` block supports the following:
 
 * `cdn_frontdoor_domain_id` - (Required) The Resource Id of the **Front Door Custom Domain** or **Front Door Endpoint** that should be bound to this Front Door Security Policy.
+
+---
+
+A `route` block supports the following:
+
+* `cdn_frontdoor_route_id` - (Required) The Resource Id of the **Front Door Route** that should be bound to this Front Door Security Policy.
 
 ---
 
@@ -156,12 +211,19 @@ An `association` block exports the following:
 
 * `domain` - A `domain` block as defined below.
 
+* `route` - A `route` block as defined below.
+
 ---
 
 A `domain` block exports the following:
 
 * `active` - Whether the Front Door Custom Domain or Front Door Endpoint is active.
 
+---
+
+A `route` block exports the following:
+
+* `cdn_frontdoor_route_id` - The Resource Id of the Front Door Route associated with this Front Door Security Policy.
 
 ## Timeouts
 

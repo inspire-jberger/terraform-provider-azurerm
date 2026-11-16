@@ -42,6 +42,20 @@ func TestAccCdnFrontDoorSecurityPolicyDataSource_basic(t *testing.T) {
 	})
 }
 
+func TestAccCdnFrontDoorSecurityPolicyDataSource_route(t *testing.T) {
+	data := acceptance.BuildTestData(t, "data.azurerm_cdn_frontdoor_security_policy", "test")
+	d := CdnFrontDoorSecurityPolicyDataSource{}
+
+	data.DataSourceTest(t, []acceptance.TestStep{
+		{
+			Config: d.route(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).Key("security_policies.0.firewall.0.association.0.route.0.cdn_frontdoor_route_id").MatchesOtherKey(check.That("azurerm_cdn_frontdoor_route.test").Key("id")),
+			),
+		},
+	})
+}
+
 func (CdnFrontDoorSecurityPolicyDataSource) preCheck(t *testing.T) {
 	CdnFrontDoorSecurityPolicyResource{}.preCheck(t)
 }
@@ -56,4 +70,16 @@ data "azurerm_cdn_frontdoor_security_policy" "test" {
   resource_group_name = azurerm_resource_group.test.name
 }
 `, CdnFrontDoorSecurityPolicyResource{}.basic(data))
+}
+
+func (CdnFrontDoorSecurityPolicyDataSource) route(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+data "azurerm_cdn_frontdoor_security_policy" "test" {
+  name                = azurerm_cdn_frontdoor_security_policy.test.name
+  profile_name        = azurerm_cdn_frontdoor_profile.test.name
+  resource_group_name = azurerm_resource_group.test.name
+}
+`, CdnFrontDoorSecurityPolicyResource{}.routeAssociation(data, false))
 }

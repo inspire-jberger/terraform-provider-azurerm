@@ -105,7 +105,10 @@ func expandCdnFrontdoorFirewallPolicyParameters(input []any, isStandardSku bool)
 	for _, item := range configAssociations {
 		v := item.(map[string]any)
 		domains := expandSecurityPoliciesActivatedResourceReference(v["domain"].([]any))
-		domainCount := len(*domains)
+		domainCount := 0
+		if domains != nil {
+			domainCount = len(*domains)
+		}
 
 		if isStandardSku {
 			if domainCount > 100 {
@@ -120,6 +123,7 @@ func expandCdnFrontdoorFirewallPolicyParameters(input []any, isStandardSku bool)
 		association := securitypolicies.SecurityPolicyWebApplicationFirewallAssociation{
 			Domains:         domains,
 			PatternsToMatch: pluginsdk.ExpandStringSlice(v["patterns_to_match"].([]any)),
+			Routes:          expandSecurityPoliciesResourceReference(v["route"].([]any)),
 		}
 
 		associations = append(associations, association)
@@ -133,7 +137,7 @@ func expandCdnFrontdoorFirewallPolicyParameters(input []any, isStandardSku bool)
 func expandSecurityPoliciesActivatedResourceReference(input []any) *[]securitypolicies.ActivatedResourceReference {
 	results := make([]securitypolicies.ActivatedResourceReference, 0)
 	if len(input) == 0 {
-		return &results
+		return nil
 	}
 
 	for _, item := range input {
@@ -141,6 +145,24 @@ func expandSecurityPoliciesActivatedResourceReference(input []any) *[]securitypo
 
 		if id := v["cdn_frontdoor_domain_id"].(string); id != "" {
 			results = append(results, securitypolicies.ActivatedResourceReference{
+				Id: pointer.To(id),
+			})
+		}
+	}
+
+	return &results
+}
+
+func expandSecurityPoliciesResourceReference(input []any) *[]securitypolicies.ResourceReference {
+	if len(input) == 0 {
+		return nil
+	}
+
+	results := make([]securitypolicies.ResourceReference, 0, len(input))
+	for _, item := range input {
+		v := item.(map[string]any)
+		if id := v["cdn_frontdoor_route_id"].(string); id != "" {
+			results = append(results, securitypolicies.ResourceReference{
 				Id: pointer.To(id),
 			})
 		}

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/afddomains"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/afdendpoints"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/profiles"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/routes"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/cdn/2026-10-01/securitypolicies"
 	"github.com/hashicorp/go-azure-sdk/resource-manager/frontdoor/2024-02-01/webapplicationfirewallpolicies"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
@@ -83,6 +84,29 @@ func flattenSecurityPoliciesActivatedResourceReference(input *[]securitypolicies
 	return results, nil
 }
 
+func flattenSecurityPoliciesResourceReference(input *[]securitypolicies.ResourceReference) ([]string, error) {
+	results := make([]string, 0)
+	if input == nil {
+		return results, nil
+	}
+
+	for _, item := range *input {
+		routeId := ""
+		if item.Id != nil {
+			parsedRouteId, err := routes.ParseRouteIDInsensitively(*item.Id)
+			if err != nil {
+				return nil, fmt.Errorf("flattening `cdn_frontdoor_route_id`: %+v", err)
+			}
+
+			routeId = parsedRouteId.ID()
+		}
+
+		results = append(results, routeId)
+	}
+
+	return results, nil
+}
+
 func flattenCdnFrontDoorSecurityPolicyResource(input securitypolicies.SecurityPolicyPropertiesParameters) ([]any, error) {
 	results := make([]any, 0)
 	if input.SecurityPolicyPropertiesParameters().Type != securitypolicies.SecurityPolicyTypeWebApplicationFirewall {
@@ -109,8 +133,21 @@ func flattenCdnFrontDoorSecurityPolicyResource(input securitypolicies.SecurityPo
 				return results, fmt.Errorf("flattening `domain`: %+v", err)
 			}
 
+			routeIds, err := flattenSecurityPoliciesResourceReference(item.Routes)
+			if err != nil {
+				return results, fmt.Errorf("flattening `route`: %+v", err)
+			}
+
+			route := make([]any, 0, len(routeIds))
+			for _, id := range routeIds {
+				route = append(route, map[string]any{
+					"cdn_frontdoor_route_id": id,
+				})
+			}
+
 			associations = append(associations, map[string]any{
 				"domain":            domain,
+				"route":             route,
 				"patterns_to_match": pluginsdk.FlattenSlice(item.PatternsToMatch),
 			})
 		}
